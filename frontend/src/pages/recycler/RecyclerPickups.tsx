@@ -1,0 +1,7 @@
+import { useState } from 'react'
+import { Truck, ChevronRight } from 'lucide-react'
+import { AppLayout } from '../../layouts/AppLayout'
+import { PageHeader } from '../../components/PageHeader'
+import type { PickupStatus } from '../../types'
+const statuses:PickupStatus[]=['REQUESTED','ACCEPTED','ASSIGNED','ON_THE_WAY','ARRIVED','HANDOVER','COMPLETED']
+export default function RecyclerPickups(){const [status,setStatus]=useState<PickupStatus>('ACCEPTED');const next=statuses[Math.min(statuses.indexOf(status)+1,statuses.length-1)];return <AppLayout><div className="mx-auto max-w-3xl"><PageHeader title="Pickup management"/><div className="card p-6"><div className="flex items-center gap-3"><div className="rounded-2xl bg-mint p-3 text-leaf"><Truck/></div><div><div className="font-black">PICK-001 · Copper · 10 kg</div><div className="text-sm text-gray-500">Demo Collector · Bengaluru</div></div></div><div className="mt-6 rounded-2xl bg-gray-50 p-5"><div className="text-sm text-gray-500">Current status</div><div className="mt-1 text-2xl font-black">{status.replaceAll('_',' ')}</div></div><button disabled={status==='COMPLETED'} className="primary mt-4 w-full" onClick={()=>setStatus(next)}>{status==='COMPLETED'?'Completed':`Update → ${next.replaceAll('_',' ')}`}<ChevronRight/></button><button className="secondary mt-3 w-full" onClick={()=>setStatus('HANDOVER')}>Confirm handover</button></div></div></AppLayout>}

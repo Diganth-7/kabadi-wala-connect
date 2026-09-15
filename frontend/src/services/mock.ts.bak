@@ -1,0 +1,134 @@
+import { earnings, materials, mockUser, prices, recyclers, safetyGuides, seedLots, seedNotifications, seedTransactions } from '../data/mockData'
+import type { Condition, Lot, PaymentMethod, PaymentStatus, Pickup, PickupStatus, Recycler, Transaction, User } from '../types'
+import { makeId, makeLotId, readStorage, writeStorage } from '../utils/storage'
+
+const wait = (ms = 280) => new Promise(resolve => setTimeout(resolve, ms))
+const KEYS = { lots:'kbc_lots', pickups:'kbc_pickups', transactions:'kbc_transactions', notifications:'kbc_notifications' }
+
+function getLots() { return readStorage<Lot[]>(KEYS.lots, seedLots) }
+function saveLots(value: Lot[]) { writeStorage(KEYS.lots, value) }
+function getPickups() { return readStorage<Pickup[]>(KEYS.pickups, []) }
+function savePickups(value: Pickup[]) { writeStorage(KEYS.pickups, value) }
+function getTransactions() { return readStorage<Transaction[]>(KEYS.transactions, seedTransactions) }
+function saveTransactions(value: Transaction[]) { writeStorage(KEYS.transactions, value) }
+
+export const authService = {
+  async login(phone: string) { await wait(); if (!/^\d{10}$/.test(phone)) throw new Error('Enter a valid 10-digit phone number.'); return { message:'OTP sent' } },
+  async verifyOtp(phone: string, otp: string): Promise<User> { await wait(); if (otp !== '123456') throw new Error('Invalid demo OTP. Use 123456.'); return { ...mockUser, phone } },
+  async me() { await wait(120); return mockUser },
+}
+
+export const lotService = {
+  async getLots() { await wait(); return getLots() },
+  async getLot(id: string) { await wait(); const lot = getLots().find(x => x.id === id); if (!lot) throw new Error('LOT_NOT_FOUND'); return lot },
+  async createLot(input: { client_request_id:string; material_id:string; estimated_weight:number; condition:Condition; photo_url?:string }) {
+    await wait()
+    if (input.estimated_weight <= 0) throw new Error('INVALID_WEIGHT')
+    const existing = getLots().find(x => x.client_request_id === input.client_request_id)
+    if (existing) return existing
+    const material = materials.find(x => x.id === input.material_id)
+    if (!material) throw new Error('INVALID_MATERIAL')
+    const price = prices.find(x => x.material_id === material.id)?.current_price ?? 0
+    const pendingSync = !navigator.onLine
+    const lot: Lot = { id:makeLotId(), client_request_id:input.client_request_id, material, estimated_weight:input.estimated_weight, condition:input.condition, estimated_value:input.estimated_weight * price, status:pendingSync ? 'CREATED' : 'CREATED', created_at:new Date().toISOString(), photo_url:input.photo_url, pendingSync }
+    saveLots([lot, ...getLots()])
+    return lot
+  },
+}
+
+export const priceService = {
+  async getPrices() { await wait(); return prices },
+  async getPrice(materialId:string) { await wait(); const p = prices.find(x => x.material_id === materialId); if (!p) throw new Error('Price unavailable'); return p },
+}
+
+export const recyclerService = {
+  async findMatches(materialName?:string) {
+    await wait()
+    const authorized = recyclers.filter(r => r.authorized)
+    return materialName ? authorized.filter(r => r.accepted_materials.includes(materialName)) : authorized
+  },
+  async getAll() { await wait(); return recyclers.filter(r => r.authorized) },
+}
+
+export const pickupService = {
+  async createPickup(lotId:string, recyclerId:string) {
+    await wait()
+    const existing = getPickups().find(p => p.lot_id === lotId && p.recycler_id === recyclerId && p.status !== 'CANCELLED')
+    if (existing) return existing
+    const pickup: Pickup = { id:makeId('PICK'), lot_id:lotId, recycler_id:recyclerId, status:'REQUESTED', created_at:new Date().toISOString(), updated_at:new Date().toISOString() }
+    savePickups([pickup, ...getPickups()])
+    const lots = getLots().map(l => l.id === lotId ? {...l, status:'PICKUP_REQUESTED'} : l)
+    saveLots(lots)
+    return pickup
+  },
+  async getPickup(id:string) { await wait(); const p = getPickups().find(x => x.id === id); if (!p) throw new Error('PICKUP_NOT_FOUND'); return p },
+  async updateStatus(id:string, status:PickupStatus) {
+    await wait()
+    const pickups = getPickups()
+    const p = pickups.find(x => x.id === id)
+    if (!p) throw new Error('PICKUP_NOT_FOUND')
+    if (p.status === 'COMPLETED' || p.status === 'CANCELLED') throw new Error('INVALID_STATUS_TRANSITION')
+    if (status === 'COMPLETED' && p.status !== 'HANDOVER') throw new Error('INVALID_STATUS_TRANSITION')
+    const updated = {...p, status, updated_at:new Date().toISOString()}
+    savePickups(pickups.map(x => x.id === id ? updated : x))
+    if (status === 'ACCEPTED') {
+      saveLots(getLots().map(l => l.id === p.lot_id ? {...l, status:'ACCEPTED'} : l))
+    }
+    return updated
+  },
+}
+
+export const transactionService = {
+  async getTransactions() { await wait(); return getTransactions() },
+  async createTransaction(input:{lotId:string; material:string; weight:number; amount:number; payment_method:PaymentMethod; payment_status:PaymentStatus}) {
+    await wait()
+    const tx: Transaction = { id:makeId('TXN'), lot_id:input.lotId, material:input.material, weight:input.weight, amount:input.amount, payment_method:input.payment_method, payment_status:input.payment_status, created_at:new Date().toISOString() }
+    saveTransactions([tx, ...getTransactions()])
+    return tx
+  },
+}
+
+export const paymentService = {
+  async pay(transactionId:string, method:PaymentMethod, shouldFail = false) {
+    await wait()
+    const tx = getTransactions().find(x => x.id === transactionId)
+    if (!tx) throw new Error('TRANSACTION_NOT_FOUND')
+    if (tx.payment_status === 'PAID') throw new Error('PAYMENT_ALREADY_COMPLETED')
+    const status:PaymentStatus = shouldFail ? 'FAILED' : 'PAID'
+    const updated = {...tx, payment_method:method, payment_status:status}
+    saveTransactions(getTransactions().map(x => x.id === transactionId ? updated : x))
+    if (shouldFail) throw new Error('PAYMENT_FAILED')
+    return { id:makeId('PAY'), transaction_id:transactionId, method, amount:tx.amount, status, paid_at:new Date().toISOString() }
+  },
+}
+
+export const notificationService = {
+  async getNotifications() { await wait(); return readStorage(KEYS.notifications, seedNotifications) },
+  async markRead(id:string) { await wait(); const list = readStorage(KEYS.notifications, seedNotifications).map(n => n.id === id ? {...n, read:true} : n); writeStorage(KEYS.notifications, list); return list.find(n => n.id === id)! },
+}
+
+export const handoverService = {
+  async complete(input:{lotId:string; pickupId:string; actualWeight:number; agreedPrice:number; verificationReference:string}) {
+    await wait()
+    if (input.actualWeight <= 0) throw new Error('INVALID_WEIGHT')
+    const lot = getLots().find(l => l.id === input.lotId)
+    if (!lot) throw new Error('LOT_NOT_FOUND')
+    const finalAmount = input.actualWeight * input.agreedPrice
+    saveLots(getLots().map(l => l.id === lot.id ? {...l, actual_weight:input.actualWeight, status:'COMPLETED'} : l))
+    const pickup = getPickups().find(p => p.id === input.pickupId)
+    if (pickup && pickup.status !== 'CANCELLED') savePickups(getPickups().map(p => p.id === input.pickupId ? {...p, status:'COMPLETED', updated_at:new Date().toISOString()} : p))
+    return { id:makeId('HAND'), lot_id:input.lotId, pickup_id:input.pickupId, estimated_weight:lot.estimated_weight, actual_weight:input.actualWeight, agreed_price:input.agreedPrice, final_amount:finalAmount, verification_reference:input.verificationReference, status:'COMPLETED' as const, created_at:new Date().toISOString() }
+  },
+}
+
+export const adminService = {
+  async dashboard() {
+    await wait()
+    const lots = getLots(); const tx = getTransactions()
+    return { total_collectors:1284, active_collectors:823, authorized_recyclers:42, total_ewaste_kg:12400 + lots.reduce((s,l)=>s+l.estimated_weight,0), total_transactions:3421 + tx.length, total_transaction_value:8500000 + tx.reduce((s,t)=>s+t.amount,0) }
+  },
+  async collectors() { await wait(); return [{id:'USR001',name:'Demo Collector',area:'Bengaluru',lots:12,status:'ACTIVE'},{id:'USR002',name:'Ravi Kumar',area:'Mysuru',lots:8,status:'ACTIVE'},{id:'USR003',name:'Suresh',area:'Tumakuru',lots:4,status:'INACTIVE'}] },
+  async recyclers() { await wait(); return recyclers },
+}
+
+export { earnings, materials, safetyGuides }

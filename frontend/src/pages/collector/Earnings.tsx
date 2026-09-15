@@ -1,0 +1,9 @@
+import { useEffect,useState } from 'react'
+import { Banknote, CalendarDays } from 'lucide-react'
+import { AppLayout } from '../../layouts/AppLayout'
+import { PageHeader } from '../../components/PageHeader'
+import { MetricCard } from '../../components/MetricCard'
+import { earningsService,transactionService } from '../../services'
+import type { Earnings as EarningsType, Transaction } from '../../types'
+import { formatINR,formatDate } from '../../utils/storage'
+export default function Earnings(){const [tx,setTx]=useState<Transaction[]>([]);const [earnings,setEarnings]=useState<EarningsType>({today:0,this_week:0,this_month:0,pending:0,currency:'INR'});useEffect(()=>{transactionService.getTransactions().then(setTx);earningsService.get().then(setEarnings)},[]);return <AppLayout><div className="mx-auto max-w-4xl"><PageHeader title="Earnings"/><div className="grid grid-cols-2 gap-3 md:grid-cols-4"><MetricCard label="Today" value={formatINR(earnings.today)} icon={<Banknote/>}/><MetricCard label="This week" value={formatINR(earnings.this_week)} icon={<CalendarDays/>}/><MetricCard label="This month" value={formatINR(earnings.this_month)} icon={<Banknote/>}/><MetricCard label="Pending" value={formatINR(earnings.pending)} icon={<Banknote/>}/></div><div className="card mt-5 p-5"><h2 className="text-xl font-black">Transaction history</h2><div className="mt-4 divide-y">{tx.map(t=><div key={t.id} className="flex items-center justify-between py-4"><div><div className="font-bold">{t.material} · {t.weight} kg</div><div className="text-sm text-gray-500">{formatDate(t.created_at)} · {t.payment_method}</div></div><div className="text-right"><div className="font-black">{formatINR(t.amount)}</div><div className={`text-xs font-bold ${t.payment_status==='PAID'?'text-leaf':t.payment_status==='FAILED'?'text-red-600':'text-amber-700'}`}>{t.payment_status}</div></div></div>)}</div></div></div></AppLayout>}

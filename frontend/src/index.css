@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #17221d; background: #f7f8f4; }
+body { margin: 0; min-width: 320px; }
+button, input, select { font: inherit; }
+button { -webkit-tap-highlight-color: transparent; }
+@layer components {
+  .card { @apply rounded-3xl border border-black/5 bg-white shadow-soft; }
+  .touch { @apply min-h-12 rounded-2xl px-4 py-3 font-semibold transition active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50; }
+  .primary { @apply touch bg-leaf text-white hover:bg-[#17623e]; }
+  .secondary { @apply touch bg-mint text-leaf hover:bg-[#dcf1e4]; }
+  .ghost { @apply touch bg-white border border-black/10 hover:bg-gray-50; }
+  .danger { @apply touch bg-red-50 text-red-700 border border-red-100; }
+  .label { @apply mb-2 block text-sm font-semibold text-gray-600; }
+}

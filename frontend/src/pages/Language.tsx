@@ -1,0 +1,6 @@
+import { Globe, Check } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { useApp } from '../contexts/AppContext'
+import type { Language } from '../types'
+const options:[Language,string,string][]=[['en','English','Simple English'],['hi','हिन्दी','हिंदी में'],['mr','मराठी','मराठीत']]
+export default function Language(){const {language,setLanguage}=useApp();const nav=useNavigate();return <div className="mx-auto w-full max-w-md"><div className="card p-6"><div className="mb-7 flex h-14 w-14 items-center justify-center rounded-2xl bg-mint text-leaf"><Globe/></div><h1 className="text-3xl font-black">Choose language</h1><p className="mt-2 text-gray-500">You can change this later.</p><div className="mt-6 space-y-3">{options.map(([id,name,sub])=><button key={id} onClick={()=>setLanguage(id)} className={`flex w-full items-center justify-between rounded-2xl border p-4 text-left ${language===id?'border-leaf bg-mint':'border-black/10 bg-white'}`}><div><div className="font-bold">{name}</div><div className="text-sm text-gray-500">{sub}</div></div>{language===id&&<Check className="text-leaf"/>}</button>)}</div><button className="primary mt-6 w-full" onClick={()=>nav('/login')}>Continue</button></div></div>}

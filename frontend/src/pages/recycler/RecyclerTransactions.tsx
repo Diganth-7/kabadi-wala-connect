@@ -1,0 +1,4 @@
+import { CheckCircle2, IndianRupee } from 'lucide-react'
+import { AppLayout } from '../../layouts/AppLayout'
+import { PageHeader } from '../../components/PageHeader'
+export default function RecyclerTransactions(){const tx=[['TXN001','Copper','10.2 kg','₹6,630','PAID'],['TXN002','PCB','8 kg','₹3,360','PAID'],['TXN003','Aluminium','12 kg','₹2,160','PAID']];return <AppLayout><div className="mx-auto max-w-3xl"><PageHeader title="Transactions"/><div className="space-y-3">{tx.map(t=><div key={t[0]} className="card flex items-center gap-4 p-5"><div className="rounded-2xl bg-mint p-3 text-leaf"><IndianRupee/></div><div className="flex-1"><div className="font-black">{t[1]} · {t[2]}</div><div className="text-sm text-gray-500">{t[0]}</div></div><div className="text-right"><div className="font-black">{t[3]}</div><div className="flex items-center gap-1 text-xs font-bold text-leaf"><CheckCircle2 size={14}/>{t[4]}</div></div></div>)}</div></div></AppLayout>}
